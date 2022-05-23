@@ -15,7 +15,7 @@ from torchdrug.utils import pretty
 
 plt.switch_backend("agg")
 
-class Molecule(Graph):
+class MyMolecule(Graph):
     """
     Molecule graph with chemical features.
 
@@ -42,13 +42,23 @@ class Molecule(Graph):
     dummy_atom = dummy_mol.GetAtomWithIdx(0)
     dummy_bond = dummy_mol.GetBondWithIdx(0)
 
-    def __init__(self, edge_list=None, atom_type=None, bond_type=None, formal_charge=None, explicit_hs=None,
-                 chiral_tag=None, radical_electrons=None, atom_map=None, bond_stereo=None, stereo_atoms=None,
-                 node_position=None, **kwargs):
+    def __init__(self, 
+                 edge_list=None, 
+                 atom_type=None, 
+                 bond_type=None, 
+                 formal_charge=None, 
+                 explicit_hs=None,
+                 chiral_tag=None, 
+                 radical_electrons=None, 
+                 atom_map=None, 
+                 bond_stereo=None, 
+                 stereo_atoms=None,
+                 node_position=None, 
+                 **kwargs):
 
         if "num_relation" not in kwargs:
             kwargs["num_relation"] = len(self.bond2id)
-        super(Molecule, self).__init__(edge_list=edge_list, **kwargs)
+        super(MyMolecule, self).__init__(edge_list=edge_list, **kwargs)
 
         atom_type, bond_type = self._standarize_atom_bond(atom_type, bond_type)
 
@@ -159,26 +169,29 @@ class Molecule(Graph):
         radical_electrons = []
         atom_map = []
         node_position = []
+        
         _node_feature = []
-        atoms = [mol.GetAtomWithIdx(i) for i in range(mol.GetNumAtoms())] + [cls.dummy_atom]
+
+        atoms = [mol.GetAtomWithIdx(i) for i in range(mol.GetNumAtoms())] # + [cls.dummy_atom] # 为什么要加cls.dummy_atom
         for atom in atoms:
-            atom_type.append(atom.GetAtomicNum())
-            formal_charge.append(atom.GetFormalCharge())
-            explicit_hs.append(atom.GetNumExplicitHs())
+            atom_type.append(atom.GetAtomicNum()) # 获取原子序号
+            formal_charge.append(atom.GetFormalCharge()) # 获取原子形式电荷
+            explicit_hs.append(atom.GetNumExplicitHs()) # H原子数量
             chiral_tag.append(atom.GetChiralTag())
-            radical_electrons.append(atom.GetNumRadicalElectrons())
-            atom_map.append(atom.GetAtomMapNum())
+            radical_electrons.append(atom.GetNumRadicalElectrons())#自由基电子数量
+            atom_map.append(atom.GetAtomMapNum()) # 获取原子的原子地图编号，如果不存在原子图，则返回0。
             feature = []
             for name in node_feature:
                 func = R.get("features.atom.%s" % name)
                 feature += func(atom)
             _node_feature.append(feature)
+
         atom_type = torch.tensor(atom_type)[:-1]
-        atom_map = torch.tensor(atom_map)[:-1]
         formal_charge = torch.tensor(formal_charge)[:-1]
         explicit_hs = torch.tensor(explicit_hs)[:-1]
         chiral_tag = torch.tensor(chiral_tag)[:-1]
         radical_electrons = torch.tensor(radical_electrons)[:-1]
+        atom_map = torch.tensor(atom_map)[:-1]
         if mol.GetNumConformers() > 0:
             node_position = torch.tensor(mol.GetConformer().GetPositions())
         else:
@@ -188,6 +201,7 @@ class Molecule(Graph):
         else:
             _node_feature = None
 
+        # Edge <--- bond
         edge_list = []
         bond_type = []
         bond_stereo = []
@@ -206,7 +220,8 @@ class Molecule(Graph):
             type = cls.bond2id[type]
             h, t = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             edge_list += [[h, t, type], [t, h, type]]
-            # always explicitly store aromatic bonds, no matter kekulize or not
+            # always explicitly store aromatic bonds, no matter kekulize or not 
+            # 始终明确存储芳香键，无论是否 kekulize
             if bond.GetIsAromatic():
                 type = cls.bond2id["AROMATIC"]
             bond_type += [type, type]
@@ -226,6 +241,7 @@ class Molecule(Graph):
         else:
             _edge_feature = None
 
+        # Graph
         _graph_feature = []
         for name in graph_feature:
             func = R.get("features.molecule.%s" % name)
@@ -236,12 +252,23 @@ class Molecule(Graph):
             _graph_feature = None
 
         num_relation = len(cls.bond2id) - 1 if kekulize else len(cls.bond2id)
-        return cls(edge_list, atom_type, bond_type,
-                   formal_charge=formal_charge, explicit_hs=explicit_hs,
-                   chiral_tag=chiral_tag, radical_electrons=radical_electrons, atom_map=atom_map,
-                   bond_stereo=bond_stereo, stereo_atoms=stereo_atoms, node_position=node_position,
-                   node_feature=_node_feature, edge_feature=_edge_feature, graph_feature=_graph_feature,
-                   num_node=mol.GetNumAtoms(), num_relation=num_relation)
+
+        return cls(edge_list, 
+                   atom_type, 
+                   bond_type,
+                   formal_charge=formal_charge, 
+                   explicit_hs=explicit_hs,
+                   chiral_tag=chiral_tag, 
+                   radical_electrons=radical_electrons, 
+                   atom_map=atom_map,
+                   bond_stereo=bond_stereo, 
+                   stereo_atoms=stereo_atoms, 
+                   node_position=node_position,
+                   node_feature=_node_feature, 
+                   edge_feature=_edge_feature, 
+                   graph_feature=_graph_feature,
+                   num_node=mol.GetNumAtoms(), 
+                   num_relation=num_relation)
 
 
     @classmethod
@@ -268,4 +295,40 @@ class Molecule(Graph):
 
         return cls.from_molecule(mol, node_feature, edge_feature, graph_feature, with_hydrogen, kekulize)
 
+    def node_mask(self, index, compact=False):
+        self._check_no_stereo()
+        return super(MyMolecule, self).node_mask(index, compact)
+
+
+    def edge_mask(self, index):
+        self._check_no_stereo()
+        return super(MyMolecule, self).edge_mask(index)
+
+
+    def undirected(self, add_inverse=False):
+        if add_inverse:
+            raise ValueError("Bonds are undirected relations, but `add_inverse` is specified")
+        return super(MyMolecule, self).undirected(add_inverse)
+
+
+    def atom(self):
+        """
+        Context manager for atom attributes.
+        """
+        return self.node()
+
+
+    def bond(self):
+        """
+        Context manager for bond attributes.
+        """
+        return self.edge()
+
+
+if __name__=='__main__':
+
+    mol = MyMolecule.from_smiles("C1=CC=CC=C1")
+    mol.visualize()
+    print(mol.node_feature.shape)
+    print(mol.edge_feature.shape)
 
