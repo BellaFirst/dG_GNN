@@ -7,6 +7,8 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 import torch
 from torch_scatter import scatter_add, scatter_min, scatter_max
 
+# import torchdrug as td
+from torchdrug import data
 from torchdrug import utils
 from torchdrug.data import constant, Graph, PackedGraph
 from torchdrug.core import Registry as R
@@ -37,6 +39,7 @@ class MyMolecule(Graph):
     atom2valence = {1: 1, 5: 3, 6: 4, 7: 3, 8: 2, 9: 1, 14: 4, 15: 5, 16: 6, 17: 1, 35: 1, 53: 7}
     bond2valence = [1, 2, 3, 1.5]
     id2bond = {v: k for k, v in bond2id.items()}
+
     empty_mol = Chem.MolFromSmiles("")
     dummy_mol = Chem.MolFromSmiles("CC")
     dummy_atom = dummy_mol.GetAtomWithIdx(0)
@@ -169,7 +172,7 @@ class MyMolecule(Graph):
         radical_electrons = []
         atom_map = []
         node_position = []
-        
+
         _node_feature = []
 
         atoms = [mol.GetAtomWithIdx(i) for i in range(mol.GetNumAtoms())] # + [cls.dummy_atom] # 为什么要加cls.dummy_atom
@@ -327,7 +330,9 @@ class MyMolecule(Graph):
 
 if __name__=='__main__':
 
-    mol = MyMolecule.from_smiles("C1=CC=CC=C1")
+    mol = MyMolecule.from_smiles("O")
+    # mol = data.Molecule.from_smiles("C1=CC=CC=C1", node_feature=['default','pretrain'])
+    # mol = MyMolecule.from_smiles("C1=NC2=C(C(=O)N1)N=CN2[C@H]3[C@@H]([C@@H]([C@H](O3)COP(=O)(O)OP(=O)(O)OP(=O)(O)O)O)O")
     mol.visualize()
     print(mol.node_feature.shape)
     print(mol.edge_feature.shape)
