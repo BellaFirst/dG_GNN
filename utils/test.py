@@ -342,7 +342,7 @@ if __name__ == '__main__':
     #'CCC1(CCC(=O)NC1=O)C2=CC=CC=C2' 
     #'C1=CC(=CC=C1NC(C(C(C(C(CO)O)O)O)O)S(=O)(=O)O)S(=O)(=O)C2=CC=C(C=C2)NC(C(C(C(C(CO)O)O)O)O)S(=O)(=O)O'
 
-    cpd_file = '/home/cao/project/dG_GNN/data/KEGG_COMPOUNDS_SMILES/compounds_all.json'
+    cpd_file = '/home/caoyh/project/dG_GNN/data/KEGG_COMPOUNDS_SMILES/compounds_all.json'
     with open(cpd_file, 'r') as f:
         compounds = json.load(f)
 
